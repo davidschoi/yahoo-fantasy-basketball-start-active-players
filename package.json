@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "description": "Automatically start active players for your Yahoo Fantasy Basketball team across the entire week. Bypass Yahoo's paywall for the 'Start Active Players' feature with one-click automation.",
   "scripts": {
-    "dev": "vite",
     "build": "tsc && vite build && node scripts/build.js",
-    "preview": "vite preview",
+    "watch": "tsc --watch & vite build --watch & node scripts/build.js",
     "clean": "rm -rf dist"
   },
   "dependencies": {

@@ -1,6 +1,4 @@
-import { execSync } from 'child_process'
-import { copyFileSync, mkdirSync, existsSync } from 'fs'
-import { join } from 'path'
+const { copyFileSync, mkdirSync, existsSync } = require('fs')
 
 console.log('🏗️ Building Yahoo Fantasy Basketball extension...')
 
