@@ -205,13 +205,32 @@ class YahooFantasyAutomator {
 
 	private countTotalActivePlayersWithGames(): number {
 		// Count all players with games (both starting and bench)
-		// Look for players with 'editable' class and opponent column has text
+		// Find the opponent column by header title
+		const opponentHeader = document.querySelector('th[title="Opponents"]');
+		if (!opponentHeader) {
+			console.log('Could not find Opponents header');
+			return 0;
+		}
+		
+		// Get the column index (1-based)
+		const headerRow = opponentHeader.parentElement;
+		if (!headerRow) {
+			console.log('Could not find header row');
+			return 0;
+		}
+		
+		const headers = Array.from(headerRow.children);
+		const opponentColumnIndex = headers.indexOf(opponentHeader) + 1; // Convert to 1-based index
+		
+		console.log(`Opponent column is at index: ${opponentColumnIndex}`);
+		
+		// Count players with games
 		const allPlayerRows = document.querySelectorAll('tr.editable[data-pos]');
 		let totalActivePlayers = 0;
 		
 		for (let i = 0; i < allPlayerRows.length; i++) {
 			const row = allPlayerRows[i] as HTMLElement;
-			const oppCell = row.querySelector('td:nth-child(5)'); // Opponent column (5th column)
+			const oppCell = row.querySelector(`td:nth-child(${opponentColumnIndex})`);
 			
 			// Check if opponent column has text (indicating a game)
 			if (oppCell && oppCell.textContent?.trim() && oppCell.textContent.trim() !== '') {
