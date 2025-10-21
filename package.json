@@ -1,0 +1,34 @@
+{
+	"name": "yahoo-fantasy-basketball-start-active-players",
+	"version": "1.0.0",
+	"description": "Chrome extension to automatically start active players in Yahoo Fantasy Basketball",
+	"main": "dist/content.js",
+	"scripts": {
+		"build": "tsx scripts/build.ts",
+		"build:ts": "tsc",
+		"build:icons": "tsx scripts/generate-icons.ts",
+		"dev": "npm run build",
+		"clean": "rm -rf dist",
+		"test": "echo 'No tests specified'"
+	},
+	"keywords": [
+		"chrome-extension",
+		"yahoo-fantasy",
+		"basketball",
+		"fantasy-sports",
+		"automation"
+	],
+	"author": "Your Name",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/yourusername/yahoo-fantasy-basketball-start-active-players"
+	},
+	"devDependencies": {
+		"@types/chrome": "^0.1.24",
+		"@types/node": "^24.9.0",
+		"sharp": "^0.34.4",
+		"tsx": "^4.20.6",
+		"typescript": "^5.9.3"
+	}
+}
