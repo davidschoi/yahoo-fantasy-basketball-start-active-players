@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans;
+  }
+}
+
+@layer components {
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+  
+  .status-dot.online {
+    @apply bg-success;
+    box-shadow: 0 0 6px rgba(40, 167, 69, 0.3);
+  }
+  
+  .status-dot.processing {
+    @apply bg-warning;
+    box-shadow: 0 0 6px rgba(255, 193, 7, 0.3);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  
+  .status-dot.completed {
+    @apply bg-success;
+    box-shadow: 0 0 6px rgba(40, 167, 69, 0.3);
+  }
+  
+  .status-dot.error {
+    @apply bg-error;
+    box-shadow: 0 0 6px rgba(220, 53, 69, 0.3);
+  }
+  
+  .date-pill {
+    @apply inline-block px-2 py-1 bg-white text-primary-500 border-2 border-primary-500 rounded-full text-xs font-medium cursor-pointer transition-all duration-200;
+  }
+  
+  .date-pill:hover {
+    @apply bg-gray-100;
+  }
+}

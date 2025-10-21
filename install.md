@@ -1,39 +1,77 @@
-# Quick Installation Guide
+# Installation Guide
 
-## Step-by-Step Installation
+## Build and Load Extension (Recommended)
 
-1. **Download the Extension**
-   - Download all files to a folder on your computer
-   - Keep all files in the same folder
+1. **Clone and Build**
 
-2. **Open Chrome Extensions**
+   ```bash
+   git clone https://github.com/davidschoi/yahoo-fantasy-basketball-start-active-players.git
+   cd yahoo-fantasy-basketball-start-active-players
+   npm install
+   npm run build
+   ```
+
+2. **Open Chrome Extensions Page**
    - Open Google Chrome
-   - Type `chrome://extensions/` in the address bar
-   - Press Enter
+   - Navigate to `chrome://extensions/`
+   - Enable "Developer mode" in the top right corner
 
-3. **Enable Developer Mode**
-   - Look for "Developer mode" toggle in the top right
-   - Turn it ON
+3. **Load the Extension**
+   - Click "Load unpacked"
+   - Select the `dist` folder (created after build)
+   - The extension should now appear in your extensions list
 
-4. **Load the Extension**
-   - Click "Load unpacked" button
-   - Select the folder containing the extension files
-   - Click "Select Folder"
-
-5. **Pin the Extension**
-   - Click the puzzle piece icon (🧩) in Chrome toolbar
+4. **Pin the Extension**
+   - Click the puzzle piece icon in Chrome's toolbar
    - Find "Yahoo Fantasy Basketball - Start Active Players"
    - Click the pin icon to keep it visible
 
-## First Use
+## Development Mode
 
-1. Go to Yahoo Fantasy Basketball
-2. Navigate to your team's roster page
-3. Click the extension icon
-4. Click "Start Active Players"
+For development, you can use:
+
+```bash
+npm run dev # Builds and shows success message
+```
+
+## Manual Installation
+
+1. Download all files to a folder on your computer
+2. Open Chrome and go to `chrome://extensions/`
+3. Enable "Developer mode"
+4. Click "Load unpacked" and select the folder
+5. The extension will be loaded and ready to use
 
 ## Troubleshooting
 
-- Make sure you're on the roster page
-- Refresh the page if the extension doesn't work
-- Check that you're logged into Yahoo Fantasy
+### Extension Not Working?
+
+1. **Check Page**: Make sure you're on your team's roster page
+2. **Refresh**: Try refreshing the page and clicking the extension again
+3. **Permissions**: Ensure the extension has permission to access the page
+4. **Update**: Make sure you have the latest version of the extension
+
+### Common Issues
+
+**"Not on Yahoo Fantasy page"**
+
+- Navigate to your team's roster page at `basketball.fantasysports.yahoo.com`
+
+**"Please navigate to roster page"**
+
+- Go to your team's roster page (not league page)
+- URL should look like: `/nba/leagueId/teamId`
+
+**"Active players processing..."**
+
+- Extension is working through each day of the week
+- Wait for completion and check results
+
+### Getting Help
+
+If you encounter issues:
+
+1. Check the browser console for error messages
+2. Make sure you're on the correct Yahoo Fantasy page
+3. Try refreshing the page and running the extension again
+4. Check that your team has players with games scheduled

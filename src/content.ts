@@ -1,271 +1,257 @@
 // Content script for Yahoo Fantasy Basketball extension
-// Automatically clicks "Start Active Players" button when bench players have games
+
+interface StartActivePlayersResult {
+  success: boolean
+  message: string
+  details?: string[]
+  weeklyResults?: {
+    totalDays: number
+    processedDays: number
+    daysWithExceptions: DayResult[]
+    summary: string
+  }
+}
 
 interface DayResult {
-	date: string;
-	started: number;
-	exceptions: string[];
-	needsManualSelection: boolean;
+  date: string
+  started: number
+  exceptions: string[]
+  needsManualSelection: boolean
 }
 
 class YahooFantasyAutomator {
-	constructor() {
-		this.setupMessageListener();
-	}
+  public setupMessageListener(): boolean {
+    chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+      if (request.action === 'processDay') {
+        this.processCurrentDayLineup(request.date)
+          .then((result) => {
+            sendResponse(result)
+          })
+          .catch((error) => {
+            sendResponse({
+              success: false,
+              message: 'Error processing day',
+              details: [error.message],
+            })
+          })
+        return true // Keep message channel open for async response
+      }
 
-	private setupMessageListener(): void {
-		chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
-			if (request.action === "processDay") {
-				this.processCurrentDayLineup()
-					.then((result) => {
-						sendResponse({ success: true, dayResult: result });
-					})
-					.catch((error) => {
-						sendResponse({ 
-							success: false, 
-							error: (error as Error).message,
-							dayResult: {
-								date: this.getCurrentDate().toISOString().split("T")[0] || "",
-								started: 0,
-								exceptions: [`Error: ${(error as Error).message}`],
-								needsManualSelection: true,
-							}
-						});
-					});
-				return true;
-			}
+      if (request.action === 'getLeagueInfo') {
+        const leagueInfo = this.getLeagueInfo()
+        sendResponse(leagueInfo)
+        return true
+      }
 
-			if (request.action === "getLeagueInfo") {
-				try {
-					const leagueInfo = this.getLeagueInfo();
-					sendResponse(leagueInfo);
-				} catch (error) {
-					sendResponse({ 
-						leagueName: "Fantasy League", 
-						teamName: "My Team" 
-					});
-				}
-				return true;
-			}
+      return false
+    })
 
-			return false;
-		});
-	}
+    return true
+  }
 
-	private async processCurrentDayLineup(): Promise<DayResult> {
-		const currentDate = this.getCurrentDate();
-		const dateStr = this.formatDate(currentDate);
+  private async processCurrentDayLineup(date: string): Promise<StartActivePlayersResult> {
+    console.log(`Processing lineup for date: ${date}`)
 
-		const result: DayResult = {
-			date: dateStr,
-			started: 0,
-			exceptions: [],
-			needsManualSelection: false,
-		};
+    try {
+      // Check if there are bench players with games
+      if (!this.hasBenchPlayersWithGames()) {
+        return {
+          success: true,
+          message: 'No bench players with games found',
+          details: [],
+        }
+      }
 
-		console.log("Checking for bench players with games...");
-		
-		// Check if there are bench players with games
-		const hasBenchPlayersWithGames = this.hasBenchPlayersWithGames();
-		
-		if (!hasBenchPlayersWithGames) {
-			console.log("No bench players with games found");
-			return result; // No need to start players
-		}
+      // Find and click the "Start Active Players" button
+      const button = this.findStartActivePlayersButton()
+      if (!button) {
+        return {
+          success: false,
+          message: 'Start Active Players button not found',
+          details: ['Button not found on page'],
+        }
+      }
 
-		console.log("Found bench players with games, looking for 'Start Active Players' button...");
-		
-		// Look for the "Start Active Players" button
-		const startActiveButton = this.findStartActivePlayersButton();
-		
-		if (!startActiveButton) {
-			console.log("No 'Start Active Players' button found");
-			result.exceptions.push("No 'Start Active Players' button found on this page");
-			result.needsManualSelection = true;
-			return result;
-		}
+      // Click the button
+      button.click()
+      console.log('Clicked Start Active Players button')
 
-		console.log("Found 'Start Active Players' button, clicking it...");
-		
-		try {
-			// Click the button
-			startActiveButton.click();
-			
-			// Wait for modal to appear and handle it
-			await this.handleStartActivePlayersModal();
-			
-			// Count remaining bench players with games (these couldn't be started)
-			const remainingBenchPlayers = this.getRemainingBenchPlayersWithGames();
-			
-			if (remainingBenchPlayers.length > 0) {
-				result.exceptions.push(`Remaining bench players with games: ${remainingBenchPlayers.join(", ")}`);
-				result.needsManualSelection = true;
-			}
-			
-			// Count total active players with games (starting + bench)
-			const totalActivePlayers = this.countTotalActivePlayersWithGames();
-			result.started = totalActivePlayers;
-			
-			console.log(`Total active players with games: ${totalActivePlayers}, ${remainingBenchPlayers.length} remain on bench`);
-			
-		} catch (error) {
-			console.error("Error clicking 'Start Active Players' button:", error);
-			result.exceptions.push(`Error clicking button: ${(error as Error).message}`);
-			result.needsManualSelection = true;
-		}
+      // Handle the modal that appears
+      await this.handleStartActivePlayersModal()
 
-		return result;
-	}
+      // Get remaining bench players with games
+      const remainingPlayers = this.getRemainingBenchPlayersWithGames()
+      
+      // Count total active players with games
+      const totalActivePlayers = this.countTotalActivePlayersWithGames()
 
-	private hasBenchPlayersWithGames(): boolean {
-		// Check if there are any bench players with games
-		const benchPlayersWithGames = document.querySelectorAll('tr.bench[data-pos="BN"] .ysf-game-status a');
-		const hasGames = benchPlayersWithGames.length > 0;
-		
-		console.log(`Found ${benchPlayersWithGames.length} bench players with games`);
-		return hasGames;
-	}
+      const result: StartActivePlayersResult = {
+        success: true,
+        message: 'Successfully processed lineup',
+        details: remainingPlayers.length > 0 ? [`Remaining bench players with games: ${remainingPlayers.join(', ')}`] : [],
+        weeklyResults: {
+          totalDays: 1,
+          processedDays: 1,
+          daysWithExceptions: remainingPlayers.length > 0 ? [{
+            date,
+            started: totalActivePlayers,
+            exceptions: [`Remaining bench players with games: ${remainingPlayers.join(', ')}`],
+            needsManualSelection: true
+          }] : [],
+          summary: remainingPlayers.length > 0 ? `Days needing manual review:\n${date}: ${totalActivePlayers} players with games\n⚠️ Remaining bench players with games: ${remainingPlayers.join(', ')}` : 'All active players started successfully! 🎉'
+        }
+      }
 
-	private findStartActivePlayersButton(): HTMLElement | null {
-		// Look for button with the specific class and text
-		const buttons = document.querySelectorAll('button, a, [role="button"]');
-		
-		for (let i = 0; i < buttons.length; i++) {
-			const button = buttons[i] as HTMLElement;
-			const text = button.textContent?.trim();
-			const className = button.className;
-			
-			// Check if it has the right text and class
-			if (text === "Start Active Players" && 
-				className.includes("start-active-players")) {
-				console.log("Found 'Start Active Players' button with classes:", className);
-				return button;
-			}
-		}
-		
-		// Fallback: look for any button with the text
-		for (let i = 0; i < buttons.length; i++) {
-			const button = buttons[i] as HTMLElement;
-			const text = button.textContent?.trim();
-			
-			if (text === "Start Active Players") {
-				console.log("Found 'Start Active Players' button by text only");
-				return button;
-			}
-		}
-		
-		return null;
-	}
+      // Update the started count with total active players
+      result.weeklyResults!.daysWithExceptions[0].started = totalActivePlayers
 
-	private async handleStartActivePlayersModal(): Promise<void> {
-		// Wait for modal to appear
-		await this.delay(1000);
-		
-		// Look for modal and handle it
-		const modal = document.querySelector('[role="dialog"], .modal, .ysf-modal');
-		if (modal) {
-			console.log("Modal detected, looking for confirm button...");
-			
-			// Look for confirm/OK button in modal
-			const confirmButton = modal.querySelector('button[type="submit"], .btn-primary, .confirm-btn, button:contains("OK"), button:contains("Confirm")') as HTMLElement;
-			if (confirmButton) {
-				console.log("Found confirm button, clicking it...");
-				confirmButton.click();
-				await this.delay(1000);
-			} else {
-				// Try pressing Escape to close modal
-				console.log("No confirm button found, trying Escape key...");
-				document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-				await this.delay(1000);
-			}
-		}
-	}
+      return result
+    } catch (error) {
+      console.error('Error processing lineup:', error)
+      return {
+        success: false,
+        message: 'Error processing lineup',
+        details: [(error as Error).message],
+      }
+    }
+  }
 
-	private getRemainingBenchPlayersWithGames(): string[] {
-		const remainingPlayers: string[] = [];
-		const benchPlayers = document.querySelectorAll('tr.bench[data-pos="BN"]');
-		
-		for (let i = 0; i < benchPlayers.length; i++) {
-			const player = benchPlayers[i] as HTMLElement;
-			const gameStatus = player.querySelector('.ysf-game-status a');
-			
-			// Check if player has a game
-			if (gameStatus && (gameStatus.textContent?.includes('pm') || gameStatus.textContent?.includes('am'))) {
-				const nameElement = player.querySelector('a[href*="player"]');
-				const name = nameElement?.textContent?.trim();
-				if (name) {
-					remainingPlayers.push(name);
-				}
-			}
-		}
-		
-		console.log(`Remaining bench players with games: ${remainingPlayers.join(", ")}`);
-		return remainingPlayers;
-	}
+  private hasBenchPlayersWithGames(): boolean {
+    // Check if there are any bench players with game status links
+    const benchPlayers = document.querySelectorAll('tr.bench[data-pos="BN"]')
+    
+    for (let i = 0; i < benchPlayers.length; i++) {
+      const player = benchPlayers[i] as HTMLElement
+      const gameStatus = player.querySelector('.ysf-game-status a')
+      
+      if (gameStatus) {
+        console.log('Found bench player with game:', gameStatus.textContent)
+        return true
+      }
+    }
+    
+    return false
+  }
 
-	private countTotalActivePlayersWithGames(): number {
-		// Count all players with games (both starting and bench)
-		// Look for players with 'editable' class and opponent column has text
-		const allPlayerRows = document.querySelectorAll('tr.editable[data-pos]');
-		let totalActivePlayers = 0;
-		
-		for (let i = 0; i < allPlayerRows.length; i++) {
-			const row = allPlayerRows[i] as HTMLElement;
-			const oppCell = row.querySelector('td:nth-child(5)'); // Opponent column (5th column)
-			
-			// Check if opponent column has text (indicating a game)
-			if (oppCell && oppCell.textContent?.trim() && oppCell.textContent.trim() !== '') {
-				totalActivePlayers++;
-			}
-		}
-		
-		console.log(`Found ${totalActivePlayers} total active players with games`);
-		return totalActivePlayers;
-	}
+  private findStartActivePlayersButton(): HTMLElement | null {
+    // Look for the "Start Active Players" button by class and text
+    const buttons = document.querySelectorAll('button.start-active-players')
+    
+    for (let i = 0; i < buttons.length; i++) {
+      const button = buttons[i] as HTMLElement
+      if (button.textContent?.includes('Start Active Players')) {
+        console.log('Found Start Active Players button by class')
+        return button
+      }
+    }
 
-	private getCurrentDate(): Date {
-		// Try to extract date from URL first
-		const urlParams = new URLSearchParams(window.location.search);
-		const dateParam = urlParams.get("date");
+    // Fallback: look for button by text content
+    const allButtons = document.querySelectorAll('button')
+    for (let i = 0; i < allButtons.length; i++) {
+      const button = allButtons[i] as HTMLElement
+      if (button.textContent?.includes('Start Active Players')) {
+        console.log('Found Start Active Players button by text')
+        return button
+      }
+    }
 
-		if (dateParam) {
-			const date = new Date(dateParam);
-			if (!isNaN(date.getTime())) {
-				return date;
-			}
-		}
+    console.log('Start Active Players button not found')
+    return null
+  }
 
-		// Fallback to current date
-		return new Date();
-	}
+  private async handleStartActivePlayersModal(): Promise<void> {
+    // Wait for modal to appear
+    await this.delay(1000)
 
-	private formatDate(date: Date): string {
-		return date.toISOString().split("T")[0] || "";
-	}
+    // Look for confirm/ok button in modal
+    const modalButtons = document.querySelectorAll('button')
+    for (let i = 0; i < modalButtons.length; i++) {
+      const button = modalButtons[i] as HTMLElement
+      const text = button.textContent?.toLowerCase()
+      if (text?.includes('confirm') || text?.includes('ok') || text?.includes('yes')) {
+        console.log('Found modal confirm button:', text)
+        button.click()
+        await this.delay(500)
+        return
+      }
+    }
 
-	private delay(ms: number): Promise<void> {
-		return new Promise((resolve) => setTimeout(resolve, ms));
-	}
+    // If no confirm button found, try to close modal with Escape
+    console.log('No confirm button found, trying Escape key')
+    const escapeEvent = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      code: 'Escape',
+      keyCode: 27,
+      which: 27,
+      bubbles: true,
+    })
+    document.dispatchEvent(escapeEvent)
+    await this.delay(500)
+  }
 
-	private getLeagueInfo(): { leagueName: string; teamName: string } {
-		try {
-			const title = document.title;
-			// Get everything before the first pipe
-			const pipeIndex = title.indexOf(" | ");
-			if (pipeIndex === -1) {
-				return { leagueName: "Fantasy League", teamName: "My Team" };
-			}
+  private getRemainingBenchPlayersWithGames(): string[] {
+    const remainingPlayers: string[] = []
+    const benchPlayers = document.querySelectorAll('tr.bench[data-pos="BN"]')
+    
+    for (let i = 0; i < benchPlayers.length; i++) {
+      const player = benchPlayers[i] as HTMLElement
+      const gameStatus = player.querySelector('.ysf-game-status a')
+      
+      if (gameStatus) {
+        // Get player name from the row
+        const nameCell = player.querySelector('td:nth-child(2)') // Assuming name is in 2nd column
+        const playerName = nameCell?.textContent?.trim() || 'Unknown Player'
+        remainingPlayers.push(playerName)
+      }
+    }
+    
+    console.log(`Found ${remainingPlayers.length} remaining bench players with games:`, remainingPlayers)
+    return remainingPlayers
+  }
 
-			const beforePipe = title.substring(0, pipeIndex).trim();
-			
-			return { leagueName: beforePipe, teamName: "" };
-		} catch (error) {
-			console.error("Error getting league info:", error);
-			return { leagueName: "Fantasy League", teamName: "My Team" };
-		}
-	}
+  private countTotalActivePlayersWithGames(): number {
+    // Count all players with games (both starting and bench)
+    // Look for players with 'editable' class and opponent column has text
+    const allPlayerRows = document.querySelectorAll('tr.editable[data-pos]')
+    let totalActivePlayers = 0
+    
+    for (let i = 0; i < allPlayerRows.length; i++) {
+      const row = allPlayerRows[i] as HTMLElement
+      const oppCell = row.querySelector('td:nth-child(5)') // Opponent column (5th column)
+      
+      // Check if opponent column has text (indicating a game)
+      if (oppCell && oppCell.textContent?.trim() && oppCell.textContent.trim() !== '') {
+        totalActivePlayers++
+      }
+    }
+    
+    console.log(`Found ${totalActivePlayers} total active players with games`)
+    return totalActivePlayers
+  }
+
+  private getLeagueInfo(): { leagueName: string; teamName: string } {
+    try {
+      const title = document.title
+      // Get everything before the first pipe
+      const pipeIndex = title.indexOf(' | ')
+      if (pipeIndex === -1) {
+        return { leagueName: 'Fantasy League', teamName: 'My Team' }
+      }
+
+      const beforePipe = title.substring(0, pipeIndex).trim()
+      
+      return { leagueName: beforePipe, teamName: '' }
+    } catch (error) {
+      console.error('Error getting league info:', error)
+      return { leagueName: 'Fantasy League', teamName: 'My Team' }
+    }
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+  }
 }
 
 // Initialize the automator
-const _automator = new YahooFantasyAutomator();
-(window as unknown as { YahooFantasyAutomator: typeof YahooFantasyAutomator }).YahooFantasyAutomator = YahooFantasyAutomator;
+const automator = new YahooFantasyAutomator()
+automator.setupMessageListener()
