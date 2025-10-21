@@ -1,4 +1,175 @@
-var h=Object.defineProperty;var g=(o,e,t)=>e in o?h(o,e,{enumerable:!0,configurable:!0,writable:!0,value:t}):o[e]=t;var u=(o,e,t)=>g(o,typeof e!="symbol"?e+"":e,t);class y{constructor(){u(this,"isProcessing",!1);u(this,"originalUrl","");u(this,"results",{totalDays:7,processedDays:0,daysWithExceptions:[],summary:""});this.setupMessageListener()}setupMessageListener(){chrome.runtime.onMessage.addListener((e,t,a)=>e.action==="processWeeklyLineups"?(this.processWeeklyLineups().then(s=>{a({success:!0,weeklyResults:s})}).catch(s=>{a({success:!1,error:s.message})}),!0):e.action==="getDayResult"?(this.handleDayResult(e.dayResult),a({success:!0}),!0):!1)}async processWeeklyLineups(){if(this.isProcessing)throw new Error("Weekly processing already in progress");this.isProcessing=!0,this.results={totalDays:7,processedDays:0,daysWithExceptions:[],summary:""};try{const[e]=await chrome.tabs.query({active:!0,currentWindow:!0});if(!e||!e.id)throw new Error("No active tab found");this.originalUrl=e.url||"";const t=this.getCurrentDate(e.url||""),a=new Date(t),s=a.getDay(),r=s===0?1:7-s+1;console.log(`Current day: ${s}, Total days to process: ${r}`);for(let i=0;i<r;i++){const l=new Date(a);l.setDate(a.getDate()+i),console.log(`Processing day ${i}: ${l.toDateString()} (day ${l.getDay()})`);const c=this.formatDate(l);console.log(`Navigating to date: ${c}`);try{await this.navigateToDate(e.id,c),await this.delay(3e3);const n=await chrome.tabs.sendMessage(e.id,{action:"processDay",date:c});n!=null&&n.success&&(this.results.processedDays++,(n.dayResult.needsManualSelection||n.dayResult.exceptions.length>0)&&this.results.daysWithExceptions.push(n.dayResult))}catch(n){console.error(`Error processing ${c}:`,n),this.results.daysWithExceptions.push({date:c,started:0,exceptions:[`Error: ${n.message}`],needsManualSelection:!0})}}return this.results.summary=this.generateWeeklySummary(this.results),console.log("Weekly lineup processing completed! 📊"),console.log(this.results.summary),this.originalUrl&&(await chrome.tabs.update(e.id,{url:this.originalUrl}),console.log(`Navigated back to original URL: ${this.originalUrl}`)),this.results}finally{this.isProcessing=!1}}async navigateToDate(e,t){const a=await chrome.tabs.get(e),s=new URL(a.url||"");s.searchParams.set("date",t),await chrome.tabs.update(e,{url:s.toString()}),await this.waitForTabLoad(e)}async waitForTabLoad(e){return new Promise(t=>{const a=(s,r)=>{s===e&&r.status==="complete"&&(chrome.tabs.onUpdated.removeListener(a),t())};chrome.tabs.onUpdated.addListener(a)})}handleDayResult(e){this.results.processedDays++,(e.needsManualSelection||e.exceptions.length>0)&&this.results.daysWithExceptions.push(e)}generateWeeklySummary(e){const t=e.daysWithExceptions.filter(s=>s.exceptions.some(r=>r.includes("Remaining bench players")));if(t.length===0)return"All active players started successfully! 🎉";let a=`Days needing manual review:
-`;return t.forEach(s=>{const r=s.exceptions.filter(i=>i.includes("Remaining bench players")).map(i=>i.replace("Remaining bench players with games: ","")).join(", ");a+=`${s.date}: ${s.started} players with games
-`,a+=`⚠️ Remaining bench players with games: ${r}
-`}),a}getCurrentDate(e){try{const s=new URL(e).searchParams.get("date");if(s)return this.parseLocalDate(s)}catch{}const t=new Date;return new Date(t.getFullYear(),t.getMonth(),t.getDate())}parseLocalDate(e){const t=e.split("-"),a=parseInt(t[0]||"0",10),s=parseInt(t[1]||"0",10),r=parseInt(t[2]||"1",10);return new Date(a,s?s-1:0,r)}formatDate(e){const t=e.getFullYear(),a=String(e.getMonth()+1).padStart(2,"0"),s=String(e.getDate()).padStart(2,"0");return`${t}-${a}-${s}`}delay(e){return new Promise(t=>setTimeout(t,e))}}new y;
+"use strict";
+class WeeklyProcessor {
+    constructor() {
+        this.isProcessing = false;
+        this.originalUrl = "";
+        this.results = {
+            totalDays: 7,
+            processedDays: 0,
+            daysWithExceptions: [],
+            summary: "",
+        };
+        this.setupMessageListener();
+    }
+    setupMessageListener() {
+        chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+            if (request.action === "processWeeklyLineups") {
+                this.processWeeklyLineups()
+                    .then((results) => {
+                    sendResponse({ success: true, weeklyResults: results });
+                })
+                    .catch((error) => {
+                    sendResponse({ success: false, error: error.message });
+                });
+                return true;
+            }
+            if (request.action === "getDayResult") {
+                this.handleDayResult(request.dayResult);
+                sendResponse({ success: true });
+                return true;
+            }
+            return false;
+        });
+    }
+    async processWeeklyLineups() {
+        if (this.isProcessing) {
+            throw new Error("Weekly processing already in progress");
+        }
+        this.isProcessing = true;
+        this.results = {
+            totalDays: 7,
+            processedDays: 0,
+            daysWithExceptions: [],
+            summary: "",
+        };
+        try {
+            const [tab] = await chrome.tabs.query({
+                active: true,
+                currentWindow: true,
+            });
+            if (!tab || !tab.id) {
+                throw new Error("No active tab found");
+            }
+            this.originalUrl = tab.url || "";
+            const currentDate = this.getCurrentDate(tab.url || "");
+            const startDate = new Date(currentDate);
+            const currentDay = startDate.getDay();
+            const totalDays = currentDay === 0 ? 1 : (7 - currentDay + 1);
+            console.log(`Current day: ${currentDay}, Total days to process: ${totalDays}`);
+            for (let i = 0; i < totalDays; i++) {
+                const date = new Date(startDate);
+                date.setDate(startDate.getDate() + i);
+                console.log(`Processing day ${i}: ${date.toDateString()} (day ${date.getDay()})`);
+                const dateStr = this.formatDate(date);
+                console.log(`Navigating to date: ${dateStr}`);
+                try {
+                    await this.navigateToDate(tab.id, dateStr);
+                    await this.delay(3000);
+                    const response = await chrome.tabs.sendMessage(tab.id, {
+                        action: "processDay",
+                        date: dateStr,
+                    });
+                    if (response?.success) {
+                        this.results.processedDays++;
+                        if (response.dayResult.needsManualSelection ||
+                            response.dayResult.exceptions.length > 0) {
+                            this.results.daysWithExceptions.push(response.dayResult);
+                        }
+                    }
+                }
+                catch (error) {
+                    console.error(`Error processing ${dateStr}:`, error);
+                    this.results.daysWithExceptions.push({
+                        date: dateStr,
+                        started: 0,
+                        exceptions: [`Error: ${error.message}`],
+                        needsManualSelection: true,
+                    });
+                }
+            }
+            this.results.summary = this.generateWeeklySummary(this.results);
+            console.log(`Weekly lineup processing completed! 📊`);
+            console.log(this.results.summary);
+            if (this.originalUrl) {
+                await chrome.tabs.update(tab.id, { url: this.originalUrl });
+                console.log(`Navigated back to original URL: ${this.originalUrl}`);
+            }
+            return this.results;
+        }
+        finally {
+            this.isProcessing = false;
+        }
+    }
+    async navigateToDate(tabId, dateStr) {
+        const tab = await chrome.tabs.get(tabId);
+        const currentUrl = new URL(tab.url || "");
+        currentUrl.searchParams.set("date", dateStr);
+        await chrome.tabs.update(tabId, {
+            url: currentUrl.toString(),
+        });
+        await this.waitForTabLoad(tabId);
+    }
+    async waitForTabLoad(tabId) {
+        return new Promise((resolve) => {
+            const listener = (updatedTabId, changeInfo) => {
+                if (updatedTabId === tabId && changeInfo.status === "complete") {
+                    chrome.tabs.onUpdated.removeListener(listener);
+                    resolve();
+                }
+            };
+            chrome.tabs.onUpdated.addListener(listener);
+        });
+    }
+    handleDayResult(dayResult) {
+        this.results.processedDays++;
+        if (dayResult.needsManualSelection || dayResult.exceptions.length > 0) {
+            this.results.daysWithExceptions.push(dayResult);
+        }
+    }
+    generateWeeklySummary(results) {
+        const daysWithRemainingBench = results.daysWithExceptions.filter(day => day.exceptions.some(exception => exception.includes("Remaining bench players")));
+        if (daysWithRemainingBench.length === 0) {
+            return "All active players started successfully! 🎉";
+        }
+        let summary = "Days needing manual review:\n";
+        daysWithRemainingBench.forEach((day) => {
+            const remainingPlayers = day.exceptions
+                .filter(e => e.includes("Remaining bench players"))
+                .map(e => e.replace("Remaining bench players with games: ", ""))
+                .join(", ");
+            summary += `${day.date}: ${day.started} players with games\n`;
+            summary += `⚠️ Remaining bench players with games: ${remainingPlayers}\n`;
+        });
+        return summary;
+    }
+    getCurrentDate(url) {
+        try {
+            const urlObj = new URL(url);
+            const dateParam = urlObj.searchParams.get("date");
+            if (dateParam) {
+                return this.parseLocalDate(dateParam);
+            }
+        }
+        catch {
+        }
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    }
+    parseLocalDate(ymd) {
+        const parts = ymd.split("-");
+        const y = parseInt(parts[0] || "0", 10);
+        const m = parseInt(parts[1] || "0", 10);
+        const d = parseInt(parts[2] || "1", 10);
+        return new Date(y, (m ? m - 1 : 0), d);
+    }
+    formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+    }
+    delay(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+}
+const _processor = new WeeklyProcessor();
