@@ -3,7 +3,7 @@
 	"name": "Yahoo Fantasy Basketball - Start Active Players",
 	"version": "1.0.0",
 	"description": "Automatically start active players for the rest of the week in Yahoo Fantasy Basketball",
-	"permissions": ["activeTab", "storage", "tabs"],
+	"permissions": ["activeTab", "tabs"],
 	"host_permissions": [
 		"https://basketball.fantasysports.yahoo.com/*",
 		"https://fantasysports.yahoo.com/*"
