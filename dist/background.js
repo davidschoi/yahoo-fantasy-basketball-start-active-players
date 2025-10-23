@@ -1,4 +1,10 @@
-import { STATUS_MESSAGES } from './types';
+"use strict";
+const STATUS_MESSAGES = {
+    idle: "Ready to start active players",
+    processing: "Active players processing...",
+    completed: "Active players completed",
+    error: "Active players error"
+};
 class WeeklyProcessor {
     constructor() {
         this.isProcessing = false;

@@ -1,4 +1,9 @@
-import { DayResult } from './types';
+interface DayResult {
+	date: string;
+	started: number;
+	exceptions: string[];
+	needsManualSelection: boolean;
+}
 
 class YahooFantasyAutomator {
 	constructor() {

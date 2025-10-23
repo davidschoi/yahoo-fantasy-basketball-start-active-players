@@ -1,3 +1,4 @@
+"use strict";
 class YahooFantasyAutomator {
     constructor() {
         this.setupMessageListener();
@@ -207,4 +208,3 @@ class YahooFantasyAutomator {
 const automator = new YahooFantasyAutomator();
 void automator;
 window.YahooFantasyAutomator = YahooFantasyAutomator;
-export {};

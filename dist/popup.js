@@ -1,20 +1,25 @@
+"use strict";
 document.addEventListener("DOMContentLoaded", () => {
     const startActiveBtn = document.getElementById("startActiveBtn");
-    const refreshBtn = document.getElementById("refreshBtn");
-    const resetBtn = document.getElementById("resetBtn");
     const loading = document.getElementById("loading");
     const results = document.getElementById("results");
     const statusDot = document.getElementById("statusDot");
     const statusText = document.getElementById("statusText");
     const leagueInfo = document.getElementById("leagueInfo");
-    checkPageStatus();
-    restoreStateFromBackground();
-    initializeHideableInstructions();
     startActiveBtn.addEventListener("click", startActivePlayers);
-    refreshBtn.addEventListener("click", checkPageStatus);
-    resetBtn.addEventListener("click", resetState);
+    initializeHideableInstructions();
+    checkPageStatus().then(() => {
+        restoreStateFromBackground();
+    });
     async function restoreStateFromBackground() {
         try {
+            const [tab] = await chrome.tabs.query({
+                active: true,
+                currentWindow: true,
+            });
+            if (!tab || !tab.url?.includes("basketball.fantasysports.yahoo.com")) {
+                return;
+            }
             const response = await chrome.runtime.sendMessage({
                 action: "getCurrentState",
             });
@@ -41,21 +46,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         catch (error) {
             console.error("Error restoring state from background:", error);
-        }
-    }
-    async function resetState() {
-        try {
-            await chrome.runtime.sendMessage({
-                action: "resetState",
-            });
-            setStatus("online", "Ready to start active players");
-            startActiveBtn.disabled = false;
-            showLoading(false);
-            hideResults();
-            await checkPageStatus();
-        }
-        catch (error) {
-            console.error("Error resetting state:", error);
         }
     }
     async function checkPageStatus() {
@@ -114,14 +104,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     async function startActivePlayers() {
         try {
-            showLoading(true);
-            hideResults();
-            startActiveBtn.disabled = true;
-            setStatus("processing", "Active players processing...");
             const [tab] = await chrome.tabs.query({
                 active: true,
                 currentWindow: true,
             });
+            if (!tab || !tab.url?.includes("basketball.fantasysports.yahoo.com")) {
+                setStatus("offline", "Please navigate to Yahoo Fantasy Basketball page");
+                startActiveBtn.disabled = true;
+                return;
+            }
+            showLoading(true);
+            hideResults();
+            startActiveBtn.disabled = true;
+            setStatus("processing", "Active players processing...");
             if (!tab || !tab.id) {
                 throw new Error("No active tab found");
             }
@@ -232,4 +227,3 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     setInterval(checkPageStatus, 5000);
 });
-export {};

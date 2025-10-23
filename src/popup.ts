@@ -1,38 +1,47 @@
-import { ProcessingStatus } from './types';
+type PopupProcessingStatus = "idle" | "processing" | "completed" | "error";
 
 document.addEventListener("DOMContentLoaded", () => {
 	const startActiveBtn = document.getElementById(
 		"startActiveBtn",
 	) as HTMLButtonElement;
-	const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
-	const resetBtn = document.getElementById("resetBtn") as HTMLButtonElement;
 	const loading = document.getElementById("loading") as HTMLElement;
 	const results = document.getElementById("results") as HTMLElement;
 	const statusDot = document.getElementById("statusDot") as HTMLElement;
 	const statusText = document.getElementById("statusText") as HTMLElement;
 	const leagueInfo = document.getElementById("leagueInfo") as HTMLElement;
 
-	// Check initial page status and restore state
-	checkPageStatus();
-	restoreStateFromBackground();
+	// Event listeners
+	startActiveBtn.addEventListener("click", startActivePlayers);
 
 	// Initialize hideable instructions
 	initializeHideableInstructions();
 
-	// Event listeners
-	startActiveBtn.addEventListener("click", startActivePlayers);
-	refreshBtn.addEventListener("click", checkPageStatus);
-	resetBtn.addEventListener("click", resetState);
+	// Check initial page status first, then restore state
+	checkPageStatus().then(() => {
+		// Only restore background state after page status is checked
+		restoreStateFromBackground();
+	});
 
 	async function restoreStateFromBackground(): Promise<void> {
 		try {
+			// First check if we're on the right page before restoring state
+			const [tab] = await chrome.tabs.query({
+				active: true,
+				currentWindow: true,
+			});
+
+			if (!tab || !tab.url?.includes("basketball.fantasysports.yahoo.com")) {
+				// Don't restore state if not on the right page
+				return;
+			}
+
 			const response = await chrome.runtime.sendMessage({
 				action: "getCurrentState",
 			}) as {
 				success: boolean;
 				state?: {
 					isProcessing: boolean;
-					status: ProcessingStatus;
+					status: PopupProcessingStatus;
 					statusMessage: string;
 					results: {
 						totalDays: number;
@@ -52,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
 			if (response.success && response.state) {
 				const state = response.state;
 				
-				// Update status based on background state
+				// Only update status if there's actual background state to restore
 				if (state.isProcessing) {
 					setStatus("processing", state.statusMessage);
 					startActiveBtn.disabled = true;
@@ -68,28 +77,10 @@ document.addEventListener("DOMContentLoaded", () => {
 					showLoading(false);
 					showResults("error", state.statusMessage);
 				}
+				// If state is "idle", don't override the page status check
 			}
 		} catch (error) {
 			console.error("Error restoring state from background:", error);
-		}
-	}
-
-	async function resetState(): Promise<void> {
-		try {
-			await chrome.runtime.sendMessage({
-				action: "resetState",
-			});
-			
-			// Reset UI state
-			setStatus("online", "Ready to start active players");
-			startActiveBtn.disabled = false;
-			showLoading(false);
-			hideResults();
-			
-			// Refresh page status
-			await checkPageStatus();
-		} catch (error) {
-			console.error("Error resetting state:", error);
 		}
 	}
 
@@ -154,22 +145,29 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	}
 
-	function setStatus(status: "online" | "offline" | ProcessingStatus, message: string): void {
+	function setStatus(status: "online" | "offline" | PopupProcessingStatus, message: string): void {
 		statusDot.className = `status-dot ${status}`;
 		statusText.textContent = message;
 	}
 
 	async function startActivePlayers(): Promise<void> {
 		try {
-			showLoading(true);
-			hideResults();
-			startActiveBtn.disabled = true;
-			setStatus("processing", "Active players processing...");
-
+			// Safety check: ensure we're on the right page
 			const [tab] = await chrome.tabs.query({
 				active: true,
 				currentWindow: true,
 			});
+
+			if (!tab || !tab.url?.includes("basketball.fantasysports.yahoo.com")) {
+				setStatus("offline", "Please navigate to Yahoo Fantasy Basketball page");
+				startActiveBtn.disabled = true;
+				return;
+			}
+
+			showLoading(true);
+			hideResults();
+			startActiveBtn.disabled = true;
+			setStatus("processing", "Active players processing...");
 
 			if (!tab || !tab.id) {
 				throw new Error("No active tab found");
