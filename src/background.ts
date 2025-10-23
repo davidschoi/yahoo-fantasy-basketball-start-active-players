@@ -1,18 +1,4 @@
-// Background script for Yahoo Fantasy Basketball extension
-
-interface WeeklyResults {
-	totalDays: number;
-	processedDays: number;
-	daysWithExceptions: DayResult[];
-	summary: string;
-}
-
-interface DayResult {
-	date: string;
-	started: number;
-	exceptions: string[];
-	needsManualSelection: boolean;
-}
+import { ProcessingStatus, WeeklyResults, DayResult, STATUS_MESSAGES } from './types';
 
 class WeeklyProcessor {
 	private isProcessing: boolean = false;
@@ -23,6 +9,7 @@ class WeeklyProcessor {
 		daysWithExceptions: [],
 		summary: "",
 	};
+	private currentStatus: ProcessingStatus = "idle";
 
 	constructor() {
 		this.setupMessageListener();
@@ -47,6 +34,26 @@ class WeeklyProcessor {
 				return true;
 			}
 
+			if (request.action === "getCurrentState") {
+				sendResponse({
+					success: true,
+					state: {
+						isProcessing: this.isProcessing,
+						status: this.currentStatus,
+						statusMessage: STATUS_MESSAGES[this.currentStatus],
+						results: this.results,
+						originalUrl: this.originalUrl
+					}
+				});
+				return true;
+			}
+
+			if (request.action === "resetState") {
+				this.resetState();
+				sendResponse({ success: true });
+				return true;
+			}
+
 			return false;
 		});
 	}
@@ -57,6 +64,7 @@ class WeeklyProcessor {
 		}
 
 		this.isProcessing = true;
+		this.currentStatus = "processing";
 		this.results = {
 			totalDays: 7,
 			processedDays: 0,
@@ -142,7 +150,14 @@ class WeeklyProcessor {
 				console.log(`Navigated back to original URL: ${this.originalUrl}`);
 			}
 
+			// Update status to completed
+			this.currentStatus = "completed";
+
 			return this.results;
+		} catch (error) {
+			// Update status to error
+			this.currentStatus = "error";
+			throw error;
 		} finally {
 			this.isProcessing = false;
 		}
@@ -241,7 +256,21 @@ class WeeklyProcessor {
 	private delay(ms: number): Promise<void> {
 		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
+
+	private resetState(): void {
+		this.isProcessing = false;
+		this.currentStatus = "idle";
+		this.originalUrl = "";
+		this.results = {
+			totalDays: 7,
+			processedDays: 0,
+			daysWithExceptions: [],
+			summary: "",
+		};
+	}
 }
 
 // Initialize the processor
-const _processor = new WeeklyProcessor();
+const processor = new WeeklyProcessor();
+// Reference to prevent unused variable warning
+void processor;	

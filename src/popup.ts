@@ -1,17 +1,20 @@
-// Popup script for Yahoo Fantasy Basketball extension
+import { ProcessingStatus } from './types';
+
 document.addEventListener("DOMContentLoaded", () => {
 	const startActiveBtn = document.getElementById(
 		"startActiveBtn",
 	) as HTMLButtonElement;
 	const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
+	const resetBtn = document.getElementById("resetBtn") as HTMLButtonElement;
 	const loading = document.getElementById("loading") as HTMLElement;
 	const results = document.getElementById("results") as HTMLElement;
 	const statusDot = document.getElementById("statusDot") as HTMLElement;
 	const statusText = document.getElementById("statusText") as HTMLElement;
 	const leagueInfo = document.getElementById("leagueInfo") as HTMLElement;
 
-	// Check initial page status
+	// Check initial page status and restore state
 	checkPageStatus();
+	restoreStateFromBackground();
 
 	// Initialize hideable instructions
 	initializeHideableInstructions();
@@ -19,6 +22,76 @@ document.addEventListener("DOMContentLoaded", () => {
 	// Event listeners
 	startActiveBtn.addEventListener("click", startActivePlayers);
 	refreshBtn.addEventListener("click", checkPageStatus);
+	resetBtn.addEventListener("click", resetState);
+
+	async function restoreStateFromBackground(): Promise<void> {
+		try {
+			const response = await chrome.runtime.sendMessage({
+				action: "getCurrentState",
+			}) as {
+				success: boolean;
+				state?: {
+					isProcessing: boolean;
+					status: ProcessingStatus;
+					statusMessage: string;
+					results: {
+						totalDays: number;
+						processedDays: number;
+						daysWithExceptions: Array<{
+							date: string;
+							started: number;
+							exceptions: string[];
+							needsManualSelection: boolean;
+						}>;
+						summary: string;
+					};
+					originalUrl: string;
+				};
+			};
+
+			if (response.success && response.state) {
+				const state = response.state;
+				
+				// Update status based on background state
+				if (state.isProcessing) {
+					setStatus("processing", state.statusMessage);
+					startActiveBtn.disabled = true;
+					showLoading(true);
+				} else if (state.status === "completed" && state.results.summary) {
+					setStatus("completed", state.statusMessage);
+					startActiveBtn.disabled = false;
+					showLoading(false);
+					await showWeeklyResults("Weekly lineup processing completed!", state.results);
+				} else if (state.status === "error") {
+					setStatus("error", state.statusMessage);
+					startActiveBtn.disabled = false;
+					showLoading(false);
+					showResults("error", state.statusMessage);
+				}
+			}
+		} catch (error) {
+			console.error("Error restoring state from background:", error);
+		}
+	}
+
+	async function resetState(): Promise<void> {
+		try {
+			await chrome.runtime.sendMessage({
+				action: "resetState",
+			});
+			
+			// Reset UI state
+			setStatus("online", "Ready to start active players");
+			startActiveBtn.disabled = false;
+			showLoading(false);
+			hideResults();
+			
+			// Refresh page status
+			await checkPageStatus();
+		} catch (error) {
+			console.error("Error resetting state:", error);
+		}
+	}
 
 	async function checkPageStatus(): Promise<void> {
 		try {
@@ -81,7 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	}
 
-	function setStatus(status: "online" | "offline" | "processing" | "completed" | "error", message: string): void {
+	function setStatus(status: "online" | "offline" | ProcessingStatus, message: string): void {
 		statusDot.className = `status-dot ${status}`;
 		statusText.textContent = message;
 	}

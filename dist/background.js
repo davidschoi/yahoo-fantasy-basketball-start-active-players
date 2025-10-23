@@ -1,4 +1,4 @@
-"use strict";
+import { STATUS_MESSAGES } from './types';
 class WeeklyProcessor {
     constructor() {
         this.isProcessing = false;
@@ -9,6 +9,7 @@ class WeeklyProcessor {
             daysWithExceptions: [],
             summary: "",
         };
+        this.currentStatus = "idle";
         this.setupMessageListener();
     }
     setupMessageListener() {
@@ -28,6 +29,24 @@ class WeeklyProcessor {
                 sendResponse({ success: true });
                 return true;
             }
+            if (request.action === "getCurrentState") {
+                sendResponse({
+                    success: true,
+                    state: {
+                        isProcessing: this.isProcessing,
+                        status: this.currentStatus,
+                        statusMessage: STATUS_MESSAGES[this.currentStatus],
+                        results: this.results,
+                        originalUrl: this.originalUrl
+                    }
+                });
+                return true;
+            }
+            if (request.action === "resetState") {
+                this.resetState();
+                sendResponse({ success: true });
+                return true;
+            }
             return false;
         });
     }
@@ -36,6 +55,7 @@ class WeeklyProcessor {
             throw new Error("Weekly processing already in progress");
         }
         this.isProcessing = true;
+        this.currentStatus = "processing";
         this.results = {
             totalDays: 7,
             processedDays: 0,
@@ -94,7 +114,12 @@ class WeeklyProcessor {
                 await chrome.tabs.update(tab.id, { url: this.originalUrl });
                 console.log(`Navigated back to original URL: ${this.originalUrl}`);
             }
+            this.currentStatus = "completed";
             return this.results;
+        }
+        catch (error) {
+            this.currentStatus = "error";
+            throw error;
         }
         finally {
             this.isProcessing = false;
@@ -171,5 +196,17 @@ class WeeklyProcessor {
     delay(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
+    resetState() {
+        this.isProcessing = false;
+        this.currentStatus = "idle";
+        this.originalUrl = "";
+        this.results = {
+            totalDays: 7,
+            processedDays: 0,
+            daysWithExceptions: [],
+            summary: "",
+        };
+    }
 }
-const _processor = new WeeklyProcessor();
+const processor = new WeeklyProcessor();
+void processor;

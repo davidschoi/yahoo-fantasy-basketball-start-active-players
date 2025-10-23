@@ -1,12 +1,4 @@
-// Content script for Yahoo Fantasy Basketball extension
-// Automatically clicks "Start Active Players" button when bench players have games
-
-interface DayResult {
-	date: string;
-	started: number;
-	exceptions: string[];
-	needsManualSelection: boolean;
-}
+import { DayResult } from './types';
 
 class YahooFantasyAutomator {
 	constructor() {
@@ -286,5 +278,7 @@ class YahooFantasyAutomator {
 }
 
 // Initialize the automator
-const _automator = new YahooFantasyAutomator();
+const automator = new YahooFantasyAutomator();
+// Reference to prevent unused variable warning
+void automator;
 (window as unknown as { YahooFantasyAutomator: typeof YahooFantasyAutomator }).YahooFantasyAutomator = YahooFantasyAutomator;

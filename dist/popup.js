@@ -1,16 +1,63 @@
-"use strict";
 document.addEventListener("DOMContentLoaded", () => {
     const startActiveBtn = document.getElementById("startActiveBtn");
     const refreshBtn = document.getElementById("refreshBtn");
+    const resetBtn = document.getElementById("resetBtn");
     const loading = document.getElementById("loading");
     const results = document.getElementById("results");
     const statusDot = document.getElementById("statusDot");
     const statusText = document.getElementById("statusText");
     const leagueInfo = document.getElementById("leagueInfo");
     checkPageStatus();
+    restoreStateFromBackground();
     initializeHideableInstructions();
     startActiveBtn.addEventListener("click", startActivePlayers);
     refreshBtn.addEventListener("click", checkPageStatus);
+    resetBtn.addEventListener("click", resetState);
+    async function restoreStateFromBackground() {
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: "getCurrentState",
+            });
+            if (response.success && response.state) {
+                const state = response.state;
+                if (state.isProcessing) {
+                    setStatus("processing", state.statusMessage);
+                    startActiveBtn.disabled = true;
+                    showLoading(true);
+                }
+                else if (state.status === "completed" && state.results.summary) {
+                    setStatus("completed", state.statusMessage);
+                    startActiveBtn.disabled = false;
+                    showLoading(false);
+                    await showWeeklyResults("Weekly lineup processing completed!", state.results);
+                }
+                else if (state.status === "error") {
+                    setStatus("error", state.statusMessage);
+                    startActiveBtn.disabled = false;
+                    showLoading(false);
+                    showResults("error", state.statusMessage);
+                }
+            }
+        }
+        catch (error) {
+            console.error("Error restoring state from background:", error);
+        }
+    }
+    async function resetState() {
+        try {
+            await chrome.runtime.sendMessage({
+                action: "resetState",
+            });
+            setStatus("online", "Ready to start active players");
+            startActiveBtn.disabled = false;
+            showLoading(false);
+            hideResults();
+            await checkPageStatus();
+        }
+        catch (error) {
+            console.error("Error resetting state:", error);
+        }
+    }
     async function checkPageStatus() {
         try {
             const [tab] = await chrome.tabs.query({
@@ -185,3 +232,4 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     setInterval(checkPageStatus, 5000);
 });
+export {};
