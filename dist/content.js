@@ -86,7 +86,7 @@ class YahooFantasyAutomator {
     hasBenchPlayersWithGames() {
         const benchPlayersWithGames = document.querySelectorAll('tr.bench[data-pos="BN"] .ysf-game-status a');
         const hasGames = benchPlayersWithGames.length > 0;
-        console.log(`Found ${benchPlayersWithGames.length} bench players with games`);
+        console.log(`Found ${benchPlayersWithGames.length} bench players with games (excluding IL/IL+ players)`);
         return hasGames;
     }
     findStartActivePlayersButton() {
@@ -143,7 +143,7 @@ class YahooFantasyAutomator {
                 }
             }
         }
-        console.log(`Remaining bench players with games: ${remainingPlayers.join(", ")}`);
+        console.log(`Remaining bench players with games (excluding IL/IL+): ${remainingPlayers.join(", ")}`);
         return remainingPlayers;
     }
     countTotalActivePlayersWithGames() {
@@ -164,12 +164,16 @@ class YahooFantasyAutomator {
         let totalActivePlayers = 0;
         for (let i = 0; i < allPlayerRows.length; i++) {
             const row = allPlayerRows[i];
+            const position = row.getAttribute('data-pos');
+            if (position === 'IL' || position === 'IL+') {
+                continue;
+            }
             const oppCell = row.querySelector(`td:nth-child(${opponentColumnIndex})`);
             if (oppCell && oppCell.textContent?.trim() && oppCell.textContent.trim() !== '') {
                 totalActivePlayers++;
             }
         }
-        console.log(`Found ${totalActivePlayers} total active players with games`);
+        console.log(`Found ${totalActivePlayers} total active players with games (excluding IL/IL+ players)`);
         return totalActivePlayers;
     }
     getCurrentDate() {

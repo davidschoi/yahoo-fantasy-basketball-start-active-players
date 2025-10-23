@@ -94,7 +94,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
         catch (error) {
-            console.error("Error getting league info:", error);
             leagueInfo.textContent = "Yahoo Fantasy Basketball";
         }
     }

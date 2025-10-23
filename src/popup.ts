@@ -140,7 +140,6 @@ document.addEventListener("DOMContentLoaded", () => {
 				leagueInfo.textContent = "Yahoo Fantasy Basketball";
 			}
 		} catch (error) {
-			console.error("Error getting league info:", error);
 			leagueInfo.textContent = "Yahoo Fantasy Basketball";
 		}
 	}

@@ -115,11 +115,11 @@ class YahooFantasyAutomator {
 	}
 
 	private hasBenchPlayersWithGames(): boolean {
-		// Check if there are any bench players with games
+		// Check if there are any bench players with games (exclude IL and IL+)
 		const benchPlayersWithGames = document.querySelectorAll('tr.bench[data-pos="BN"] .ysf-game-status a');
 		const hasGames = benchPlayersWithGames.length > 0;
-		
-		console.log(`Found ${benchPlayersWithGames.length} bench players with games`);
+
+		console.log(`Found ${benchPlayersWithGames.length} bench players with games (excluding IL/IL+ players)`);
 		return hasGames;
 	}
 
@@ -180,12 +180,13 @@ class YahooFantasyAutomator {
 
 	private getRemainingBenchPlayersWithGames(): string[] {
 		const remainingPlayers: string[] = [];
+		// Only look at bench players (BN), exclude IL and IL+ players
 		const benchPlayers = document.querySelectorAll('tr.bench[data-pos="BN"]');
-		
+
 		for (let i = 0; i < benchPlayers.length; i++) {
 			const player = benchPlayers[i] as HTMLElement;
 			const gameStatus = player.querySelector('.ysf-game-status a');
-			
+
 			// Check if player has a game
 			if (gameStatus && (gameStatus.textContent?.includes('pm') || gameStatus.textContent?.includes('am'))) {
 				const nameElement = player.querySelector('a[href*="player"]');
@@ -195,47 +196,54 @@ class YahooFantasyAutomator {
 				}
 			}
 		}
-		
-		console.log(`Remaining bench players with games: ${remainingPlayers.join(", ")}`);
+
+		console.log(`Remaining bench players with games (excluding IL/IL+): ${remainingPlayers.join(", ")}`);
 		return remainingPlayers;
 	}
 
 	private countTotalActivePlayersWithGames(): number {
-		// Count all players with games (both starting and bench)
+		// Count all players with games (both starting and bench, excluding IL and IL+)
 		// Find the opponent column by header title
 		const opponentHeader = document.querySelector('th[title="Opponents"]');
 		if (!opponentHeader) {
 			console.log('Could not find Opponents header');
 			return 0;
 		}
-		
+
 		// Get the column index (1-based)
 		const headerRow = opponentHeader.parentElement;
 		if (!headerRow) {
 			console.log('Could not find header row');
 			return 0;
 		}
-		
+
 		const headers = Array.from(headerRow.children);
 		const opponentColumnIndex = headers.indexOf(opponentHeader) + 1; // Convert to 1-based index
-		
+
 		console.log(`Opponent column is at index: ${opponentColumnIndex}`);
-		
-		// Count players with games
+
+		// Count players with games (exclude IL and IL+ positions)
 		const allPlayerRows = document.querySelectorAll('tr.editable[data-pos]');
 		let totalActivePlayers = 0;
-		
+
 		for (let i = 0; i < allPlayerRows.length; i++) {
 			const row = allPlayerRows[i] as HTMLElement;
-			const oppCell = row.querySelector(`td:nth-child(${opponentColumnIndex})`);
+			const position = row.getAttribute('data-pos');
 			
+			// Skip IL and IL+ players
+			if (position === 'IL' || position === 'IL+') {
+				continue;
+			}
+			
+			const oppCell = row.querySelector(`td:nth-child(${opponentColumnIndex})`);
+
 			// Check if opponent column has text (indicating a game)
 			if (oppCell && oppCell.textContent?.trim() && oppCell.textContent.trim() !== '') {
 				totalActivePlayers++;
 			}
 		}
-		
-		console.log(`Found ${totalActivePlayers} total active players with games`);
+
+		console.log(`Found ${totalActivePlayers} total active players with games (excluding IL/IL+ players)`);
 		return totalActivePlayers;
 	}
 
