@@ -2,7 +2,7 @@
 
 A Chrome extension that automatically clicks "Start Active Players" for your entire week in Yahoo Fantasy Basketball, bypassing Yahoo's paywall for this premium feature.
 
-![Screenshot](assets/image.png)
+![Screenshot](assets/screenshot.png)
 
 ## Features
 
